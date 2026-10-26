@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#141830">
+<title>ねむログ</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root {
+    --bg: #141830;
+    --card: #1f2547;
+    --card2: #272e57;
+    --text: #eef0fb;
+    --muted: #9aa1c8;
+    --accent: #ffd678;
+    --accent2: #8fa8ff;
+    --good: #6fdca0;
+    --warn: #ffb36b;
+    --bad: #ff7b8a;
+    --line: #343c6e;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px);
+    max-width: 520px; margin: 0 auto; line-height: 1.5;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 6px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: .05em; }
+  .icon-btn { background: none; border: none; color: var(--muted); font-size: 22px; padding: 6px; cursor: pointer; }
+  .card { background: var(--card); border-radius: 18px; padding: 18px; margin: 12px 0; }
+  .card h2 { font-size: 14px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .status { text-align: center; }
+  .status .now { font-size: 13px; color: var(--muted); }
+  .status .big { font-size: 34px; font-weight: 700; margin: 4px 0 14px; font-variant-numeric: tabular-nums; }
+  .main-btn {
+    width: 100%; border: none; border-radius: 16px; padding: 20px; font-size: 20px; font-weight: 700;
+    cursor: pointer; color: #1a1d38; background: var(--accent);
+  }
+  .main-btn.wake { background: var(--accent2); }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .link-btn { background: none; border: none; color: var(--accent2); font-size: 13px; cursor: pointer; padding: 4px; }
+
+  .score-wrap { display: flex; gap: 16px; align-items: center; }
+  .ring { position: relative; width: 120px; height: 120px; flex: none; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .val { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring .num { font-size: 34px; font-weight: 800; line-height: 1; }
+  .ring .grade { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .breakdown { flex: 1; min-width: 0; }
+  .bd-row { font-size: 12px; margin-bottom: 7px; }
+  .bd-row .lbl { display: flex; justify-content: space-between; color: var(--muted); }
+  .bar { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; margin-top: 2px; }
+  .bar > i { display: block; height: 100%; background: var(--accent2); border-radius: 3px; }
+  .summary-line { font-size: 15px; margin: 12px 0 0; }
+  .comment { font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  .mood { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .mood p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+  .mood-btns { display: flex; gap: 6px; }
+  .mood-btns button {
+    flex: 1; background: var(--card2); border: 2px solid transparent; border-radius: 12px;
+    font-size: 24px; padding: 8px 0; cursor: pointer;
+  }
+  .mood-btns button.sel { border-color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .stat { background: var(--card2); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  #chart { width: 100%; height: auto; display: block; }
+
+  .list-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .list-item:last-child { border-bottom: none; }
+  .badge { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex: none; color: #1a1d38; }
+  .li-main { flex: 1; min-width: 0; }
+  .li-main .d { font-size: 14px; }
+  .li-main .t { font-size: 12px; color: var(--muted); }
+  .li-dur { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 6px; background: var(--card2); color: var(--muted); margin-left: 4px; }
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 12px 0; }
+
+  dialog {
+    border: none; border-radius: 20px; background: var(--card); color: var(--text);
+    width: min(92vw, 480px); padding: 20px; max-height: 88vh;
+  }
+  dialog::backdrop { background: rgba(5, 7, 20, .7); }
+  dialog h3 { margin: 0 0 14px; font-size: 17px; }
+  label.f { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  input, select {
+    width: 100%; background: var(--card2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px; font-size: 16px; font-family: inherit;
+  }
+  input[type="datetime-local"] { color-scheme: dark; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dlg-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .btn { flex: 1; border: none; border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; background: var(--card2); color: var(--text); }
+  .btn.primary { background: var(--accent); color: #1a1d38; }
+  .btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); flex: 0 0 auto; padding: 12px 14px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .code {
+    font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #0f1226; border-radius: 8px;
+    padding: 10px; word-break: break-all; margin-top: 6px; user-select: all;
+  }
+  hr { border: none; border-top: 1px solid var(--line); margin: 18px 0 6px; }
+
+  #toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translate(-50%, 140%);
+    background: #fff; color: #1a1d38; border-radius: 14px; padding: 12px 14px; font-size: 14px;
+    width: min(92vw, 480px); display: flex; gap: 10px; align-items: center; transition: transform .25s; z-index: 10;
+    box-shadow: 0 8px 30px rgba(0,0,0,.4);
+  }
+  #toast.show { transform: translate(-50%, 0); }
+  #toast span { flex: 1; }
+  #toast button { background: #1a1d38; color: #fff; border: none; border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌙 ねむログ</h1>
+  <button class="icon-btn" id="openSettings" aria-label="設定">⚙︎</button>
+</header>
+
+<section class="card status" id="statusCard"></section>
+<section class="card" id="scoreCard"></section>
+<section class="card" id="weekCard">
+  <h2>直近7日間</h2>
+  <svg id="chart" viewBox="0 0 320 150"></svg>
+  <div class="stats" id="stats"></div>
+</section>
+<section class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">履歴</h2>
+    <button class="link-btn" id="addManual">＋ 手動で追加</button>
+  </div>
+  <div id="history"></div>
+</section>
+
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <h3 id="editTitle">睡眠を編集</h3>
+    <label class="f">寝た時刻</label>
+    <input type="datetime-local" id="fStart" required>
+    <label class="f">起きた時刻</label>
+    <input type="datetime-local" id="fEnd" required>
+    <div class="row2">
+      <div>
+        <label class="f">夜中に起きた回数</label>
+        <input type="number" id="fWake" min="0" max="20" value="0">
+      </div>
+      <div>
+        <label class="f">目覚めの気分</label>
+        <select id="fMood">
+          <option value="">未入力</option>
+          <option value="5">😄 最高</option>
+          <option value="4">🙂 良い</option>
+          <option value="3">😐 ふつう</option>
+          <option value="2">🥱 だるい</option>
+          <option value="1">😫 最悪</option>
+        </select>
+      </div>
+    </div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="delBtn">削除</button>
+      <button type="button" class="btn" id="cancelEdit">キャンセル</button>
+      <button type="submit" class="btn primary">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDlg">
+  <form method="dialog" id="settingsForm">
+    <h3>設定</h3>
+    <div class="row2">
+      <div>
+        <label class="f">目標睡眠時間（時間）</label>
+        <input type="number" id="sGoal" min="4" max="12" step="0.5">
+      </div>
+      <div>
+        <label class="f">寝付くまでの時間（分）</label>
+        <input type="number" id="sLatency" min="0" max="120" step="5">
+      </div>
+    </div>
+    <p class="hint">「おやすみ」ボタンや自動記録の時刻から、寝付くまでの時間を差し引いて記録します。</p>
+    <div class="row2">
+      <div>
+        <label class="f">夜の開始（時）</label>
+        <input type="number" id="sNightStart" min="0" max="23">
+      </div>
+      <div>
+        <label class="f">夜の終了（時）</label>
+        <input type="number" id="sNightEnd" min="0" max="23">
+      </div>
+    </div>
+    <p class="hint">自動記録は、スマホを置いた時刻がこの時間帯に入るときだけ睡眠として扱います（日中の放置を除外するため）。</p>
+    <label class="f">中断を同じ睡眠としてまとめる間隔（分）</label>
+    <input type="number" id="sMerge" min="0" max="180" step="5">
+    <p class="hint">夜中にスマホを見ても、この時間以内にまた置けば1回の睡眠＋「夜中に起きた回数」として記録します。</p>
+
+    <hr>
+    <h3 style="margin-top:12px">自動記録（MacroDroid連携）</h3>
+    <p class="hint">MacroDroid の「ウェブサイトを開く」アクションに次のURLを設定します。<b>{OFF}</b> と <b>{ON}</b> は MacroDroid の変数に置き換えてください（<a href="guide.html" style="color:var(--accent2)">設定ガイドを見る</a>）。</p>
+    <div class="code" id="autoUrl"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="copyUrl">URLをコピー</button>
+      <button type="button" class="btn" id="testAuto">テスト記録</button>
+    </div>
+
+    <hr>
+    <h3 style="margin-top:12px">バックアップ</h3>
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="exportBtn">書き出し</button>
+      <button type="button" class="btn" id="importBtn">読み込み</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <p class="hint">記録はこのスマホのブラウザ内だけに保存されます。機種変更前などに書き出しておいてください。</p>
+
+    <div class="dlg-actions">
+      <button type="button" class="btn" id="cancelSettings">閉じる</button>
+      <button type="submit" class="btn primary">保存</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast"><span id="toastMsg"></span><button id="toastBtn" hidden></button></div>
+
+<script>
+// ===== データ =====
+const STORE_KEY = 'nemulog-v1';
+const DEFAULT_SETTINGS = { goalH: 7.5, latencyMin: 15, nightStart: 19, nightEnd: 6, mergeMin: 60 };
+const MOODS = { 5: '😄', 4: '🙂', 3: '😐', 2: '🥱', 1: '😫' };
+const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+
+let db = load();
+
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (d && Array.isArray(d.records)) {
+      return { records: d.records, sleepingSince: d.sleepingSince || null, settings: { ...DEFAULT_SETTINGS, ...d.settings } };
+    }
+  } catch (e) {}
+  return { records: [], sleepingSince: null, settings: { ...DEFAULT_SETTINGS } };
+}
+function save() {
+  db.records.sort((a, b) => b.end - a.end);
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); } catch (e) { toast('保存に失敗しました'); }
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+// ===== 時刻ユーティリティ =====
+const pad = (n) => String(n).padStart(2, '0');
+const fmtHM = (ms) => { const d = new Date(ms); return `${d.getHours()}:${pad(d.getMinutes())}`; };
+const fmtDate = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}(${'日月火水木金土'[d.getDay()]})`; };
+const fmtDur = (ms) => { const m = Math.round(ms / MIN); return `${Math.floor(m / 60)}時間${pad(m % 60)}分`; };
+const fmtDurShort = (ms) => { const m = Math.round(ms / MIN); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
+const toLocalInput = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const dayKey = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// 実際に眠っていた時間（夜中に起きていた時間を除く）
+const sleepMs = (r) => Math.max(0, r.end - r.start - (r.awakeMs || 0));
+
+// 就寝時刻を「18時起点の分」に変換（日付またぎを比較しやすくする）
+function bedMinutes(ms) {
+  const d = new Date(ms);
+  return ((d.getHours() - 18 + 24) % 24) * 60 + d.getMinutes();
+}
+function inNightWindow(ms) {
+  const h = new Date(ms).getHours();
+  const { nightStart: s, nightEnd: e } = db.settings;
+  return s > e ? (h >= s || h < e) : (h >= s && h < e);
+}
+
+// ===== 評価 =====
+function scoreOf(rec) {
+  const g = db.settings.goalH;
+  const h = sleepMs(rec) / HOUR;
+
+  // 睡眠時間 50点：目標〜目標+1.5時間で満点。不足は4時間で0点、寝すぎは1時間ごとに-10点
+  let dur;
+  if (h < g) dur = 50 * clamp(1 - (g - h) / 4, 0, 1);
+  else if (h <= g + 1.5) dur = 50;
+  else dur = clamp(50 - (h - g - 1.5) * 10, 20, 50);
+
+  // 規則性 20点：直近7回の就寝時刻の中央値とのズレ。30分以内で満点、2時間半で0点
+  const prev = db.records.filter((r) => r.end < rec.end && r.id !== rec.id).slice(0, 7);
+  let reg, regNote;
+  if (prev.length < 2) { reg = 15; regNote = 'データ不足'; }
+  else {
+    const mins = prev.map((r) => bedMinutes(r.start)).sort((a, b) => a - b);
+    const med = mins[Math.floor(mins.length / 2)];
+    const dev = Math.abs(bedMinutes(rec.start) - med);
+    reg = 20 * clamp(1 - (dev - 30) / 120, 0, 1);
+    regNote = `いつもと${dev < 5 ? 'ほぼ同じ' : (bedMinutes(rec.start) > med ? `${dev}分遅い` : `${dev}分早い`)}`;
+  }
+
+  // 連続性 15点：夜中に起きた回数
+  const cont = [15, 10, 5, 0][Math.min(rec.wakeups || 0, 3)];
+
+  // 目覚め 15点：気分（未入力なら他の項目だけで100点換算）
+  const hasMood = rec.mood != null;
+  const mood = hasMood ? (rec.mood - 1) / 4 * 15 : 0;
+
+  const raw = dur + reg + cont + mood;
+  const total = Math.round(hasMood ? raw : raw / 85 * 100);
+  const grade = total >= 90 ? 'S' : total >= 80 ? 'A' : total >= 65 ? 'B' : total >= 50 ? 'C' : 'D';
+
+  const parts = [
+    { key: 'dur', label: '睡眠時間', v: dur, max: 50, note: `${h.toFixed(1)}h / 目標${g}h` },
+    { key: 'reg', label: '規則性', v: reg, max: 20, note: regNote },
+    { key: 'cont', label: '連続性', v: cont, max: 15, note: `中途覚醒${rec.wakeups || 0}回` },
+    { key: 'mood', label: '目覚め', v: mood, max: 15, note: hasMood ? MOODS[rec.mood] : '未入力' },
+  ];
+  return { total, grade, parts, h, g, hasMood };
+}
+
+function commentOf(s) {
+  const weak = s.parts.filter((p) => p.key !== 'mood' || s.hasMood)
+    .map((p) => ({ ...p, ratio: p.v / p.max })).sort((a, b) => a.ratio - b.ratio)[0];
+  if (s.total >= 90) return 'しっかり眠れています。この調子！';
+  if (weak.ratio >= 0.85) return 'バランスの良い睡眠です。';
+  switch (weak.key) {
+    case 'dur': return s.h < s.g
+      ? `目標より${fmtDur((s.g - s.h) * HOUR)}短めです。今夜は少し早めに布団へ。`
+      : '少し寝すぎかもしれません。起きる時刻をそろえると楽になります。';
+    case 'reg': return '寝る時刻がいつもとズレています。毎日同じ時刻に寝ると質が上がります。';
+    case 'cont': return '夜中に何度か起きています。寝る前のスマホやカフェインを控えてみましょう。';
+    case 'mood': return '目覚めがいまひとつ。朝日を浴びると体内時計が整います。';
+  }
+  return '';
+}
+const gradeColor = (t) => t >= 80 ? 'var(--good)' : t >= 65 ? 'var(--accent2)' : t >= 50 ? 'var(--warn)' : 'var(--bad)';
+
+// ===== 記録操作 =====
+function addSleep(start, end, source) {
+  const rec = { id: uid(), start, end, wakeups: 0, awakeMs: 0, mood: null, source };
+  db.records.push(rec);
+  save();
+  return rec;
+}
+
+// MacroDroid から #auto=置いた時刻,触った時刻（UNIX秒 or ミリ秒）で呼ばれる
+function importAuto(offRaw, onRaw) {
+  const toMs = (v) => { const n = Number(v); return n > 1e12 ? n : n * 1000; };
+  const off = toMs(offRaw), on = toMs(onRaw);
+  if (!isFinite(off) || !isFinite(on) || on <= off) { toast('自動記録のデータが読み取れませんでした'); return; }
+
+  // 同じデータの二重取り込みを防ぐ
+  if (db.records.some((r) => r.autoOff === off || (r.autoOffs || []).includes(off))) { render(); return; }
+
+  // 手動・ボタンで記録済みの睡眠と重なる場合はそちらを優先
+  const overlap = db.records.find((r) => r.source !== 'auto' && off < r.end && on > r.start);
+  if (overlap) { toast('ボタンで記録済みの睡眠があるため、自動記録はスキップしました'); return; }
+
+  // 直前の睡眠から間もなければ「夜中に起きた」としてまとめる
+  const mergeMs = db.settings.mergeMin * MIN;
+  const prev = db.records.find((r) => r.source === 'auto' && off >= r.end && off - r.end <= mergeMs);
+  if (prev) {
+    prev.awakeMs = (prev.awakeMs || 0) + (off - prev.end);
+    prev.end = on;
+    prev.wakeups = (prev.wakeups || 0) + 1;
+    prev.autoOffs = [...(prev.autoOffs || []), off];
+    save();
+    render();
+    toast(`睡眠を更新しました（夜中に${prev.wakeups}回起床）`);
+    return;
+  }
+
+  const start = off + db.settings.latencyMin * MIN;
+  if (!inNightWindow(off)) {
+    toast(`${fmtHM(off)}〜${fmtHM(on)} のスマホ放置は日中のため記録していません`, '昼寝として記録', () => {
+      const r = addSleep(off, on, 'manual');
+      r.nap = true; save(); render();
+    });
+    return;
+  }
+  if (on - start < 30 * MIN) return;
+  const rec = addSleep(start, on, 'auto');
+  rec.autoOff = off;
+  save();
+  render();
+  toast(`自動記録しました：${fmtHM(start)}〜${fmtHM(on)}`);
+}
+
+function handleHash() {
+  const m = location.hash.match(/auto=([\d.]+)[,_-]([\d.]+)/);
+  if (m) {
+    importAuto(m[1], m[2]);
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+// ===== 描画 =====
+function render() {
+  renderStatus();
+  renderScore();
+  renderWeek();
+  renderHistory();
+}
+
+function renderStatus() {
+  const el = document.getElementById('statusCard');
+  if (db.sleepingSince) {
+    const elapsed = Date.now() - db.sleepingSince;
+    el.innerHTML = `
+      <div class="now">${fmtHM(db.sleepingSince)} から おやすみ中</div>
+      <div class="big">${fmtDurShort(elapsed)}</div>
+      <button class="main-btn wake" id="wakeBtn">☀️ おはよう</button>
+      <div><button class="link-btn" id="cancelSleep">取り消す</button></div>`;
+    el.querySelector('#wakeBtn').onclick = () => {
+      const start = db.sleepingSince + db.settings.latencyMin * MIN;
+      const end = Date.now();
+      db.sleepingSince = null;
+      if (end - start < 10 * MIN) { save(); render(); toast('短すぎるため記録しませんでした'); return; }
+      addSleep(start, end, 'button');
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    el.querySelector('#cancelSleep').onclick = () => { db.sleepingSince = null; save(); render(); };
+  } else {
+    const now = new Date();
+    el.innerHTML = `
+      <div class="now">${now.getMonth() + 1}月${now.getDate()}日 ${fmtHM(now)}</div>
+      <div class="big">${greeting(now)}</div>
+      <button class="main-btn" id="sleepBtn">🌙 おやすみ</button>
+      <div class="sub">寝る前にタップ。MacroDroidを設定すれば、タップしなくても自動で記録されます。</div>`;
+    el.querySelector('#sleepBtn').onclick = () => { db.sleepingSince = Date.now(); save(); render(); };
+  }
+}
+function greeting(d) {
+  const h = d.getHours();
+  return h < 4 ? 'もう寝る時間' : h < 11 ? 'おはようございます' : h < 18 ? 'こんにちは' : 'こんばんは';
+}
+
+function renderScore() {
+  const el = document.getElementById('scoreCard');
+  const rec = db.records.find((r) => !r.nap);
+  if (!rec) {
+    el.innerHTML = `<h2>睡眠スコア</h2><div class="empty">まだ記録がありません。<br>今夜「おやすみ」をタップしてみましょう。</div>`;
+    return;
+  }
+  const s = scoreOf(rec);
+  const C = 2 * Math.PI * 52;
+  const color = gradeColor(s.total);
+  const askMood = rec.mood == null && Date.now() - rec.end < 18 * HOUR;
+  el.innerHTML = `
+    <h2>${fmtDate(rec.end)} の睡眠スコア</h2>
+    <div class="score-wrap">
+      <div class="ring">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--card2)" stroke-width="10"/>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"
+            stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - s.total / 100)}"/>
+        </svg>
+        <div class="val"><div class="num">${s.total}</div><div class="grade">ランク ${s.grade}</div></div>
+      </div>
+      <div class="breakdown">
+        ${s.parts.map((p) => `
+          <div class="bd-row">
+            <div class="lbl"><span>${p.label}</span><span>${p.note}</span></div>
+            <div class="bar"><i style="width:${p.key === 'mood' && !s.hasMood ? 0 : p.v / p.max * 100}%"></i></div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <p class="summary-line">${fmtHM(rec.start)} → ${fmtHM(rec.end)}　<b>${fmtDur(sleepMs(rec))}</b></p>
+    <div class="comment">${commentOf(s)}</div>
+    ${askMood ? `
+      <div class="mood">
+        <p>目覚めの気分は？（タップで評価に反映）</p>
+        <div class="mood-btns">
+          ${[5, 4, 3, 2, 1].map((v) => `<button data-mood="${v}" aria-label="気分${v}">${MOODS[v]}</button>`).join('')}
+        </div>
+      </div>` : ''}`;
+  el.querySelectorAll('[data-mood]').forEach((b) => b.onclick = () => {
+    rec.mood = Number(b.dataset.mood); save(); render();
+  });
+}
+
+function renderWeek() {
+  const svg = document.getElementById('chart');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const t = today.getTime() - i * DAY;
+    const recs = db.records.filter((r) => dayKey(r.end) === dayKey(t) && !r.nap);
+    const ms = recs.reduce((a, r) => a + sleepMs(r), 0);
+    const sc = recs.length ? Math.max(...recs.map((r) => scoreOf(r).total)) : null;
+    days.push({ t, ms, sc });
+  }
+  const g = db.settings.goalH;
+  const maxH = Math.max(10, g + 1, ...days.map((d) => d.ms / HOUR));
+  const W = 320, H = 150, top = 14, bottom = 22, left = 4, colW = (W - left) / 7;
+  const y = (h) => top + (H - top - bottom) * (1 - h / maxH);
+  let out = '';
+  days.forEach((d, i) => {
+    const x = left + i * colW + colW * 0.2, w = colW * 0.6;
+    const h = d.ms / HOUR;
+    if (h > 0) {
+      out += `<rect x="${x}" y="${y(h)}" width="${w}" height="${y(0) - y(h)}" rx="4" fill="${gradeColor(d.sc)}" opacity=".9"/>`;
+      out += `<text x="${x + w / 2}" y="${y(h) - 3}" text-anchor="middle" font-size="9" fill="var(--text)">${h.toFixed(1)}</text>`;
+    } else {
+      out += `<rect x="${x}" y="${y(0) - 2}" width="${w}" height="2" rx="1" fill="var(--line)"/>`;
+    }
+    const dt = new Date(d.t);
+    out += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--muted)">${'日月火水木金土'[dt.getDay()]}</text>`;
+  });
+  out += `<line x1="${left}" x2="${W}" y1="${y(g)}" y2="${y(g)}" stroke="var(--accent)" stroke-dasharray="4 3" stroke-width="1"/>`;
+  out += `<text x="${W - 2}" y="9" text-anchor="end" font-size="9" fill="var(--accent)">--- 目標${g}h</text>`;
+  svg.innerHTML = out;
+
+  const filled = days.filter((d) => d.ms > 0);
+  const avg = filled.length ? filled.reduce((a, d) => a + d.ms, 0) / filled.length : 0;
+  const avgScore = filled.length ? Math.round(filled.reduce((a, d) => a + d.sc, 0) / filled.length) : null;
+  const debt = filled.reduce((a, d) => a + Math.max(0, g * HOUR - d.ms), 0);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><b>${filled.length ? fmtDurShort(avg) : '-'}</b><span>平均睡眠</span></div>
+    <div class="stat"><b>${avgScore ?? '-'}</b><span>平均スコア</span></div>
+    <div class="stat"><b style="color:${debt > 5 * HOUR ? 'var(--bad)' : debt > 2 * HOUR ? 'var(--warn)' : 'var(--text)'}">${filled.length ? fmtDurShort(debt) : '-'}</b><span>睡眠負債</span></div>`;
+}
+
+function renderHistory() {
+  const el = document.getElementById('history');
+  if (!db.records.length) { el.innerHTML = '<div class="empty">記録はまだありません</div>'; return; }
+  const srcLabel = { auto: '自動', button: 'ボタン', manual: '手動' };
+  el.innerHTML = db.records.slice(0, 60).map((r) => {
+    const s = scoreOf(r);
+    return `
+      <div class="list-item" data-id="${r.id}">
+        <div class="badge" style="background:${r.nap ? 'var(--card2)' : gradeColor(s.total)};${r.nap ? 'color:var(--muted)' : ''}">${r.nap ? '昼' : s.total}</div>
+        <div class="li-main">
+          <div class="d">${fmtDate(r.end)}<span class="tag">${r.nap ? '昼寝' : srcLabel[r.source] || ''}</span>${r.mood ? ' ' + MOODS[r.mood] : ''}</div>
+          <div class="t">${fmtHM(r.start)} → ${fmtHM(r.end)}${r.wakeups ? `・中途覚醒${r.wakeups}回` : ''}</div>
+        </div>
+        <div class="li-dur">${fmtDurShort(sleepMs(r))}</div>
+      </div>`;
+  }).join('');
+  el.querySelectorAll('.list-item').forEach((it) => it.onclick = () => openEdit(it.dataset.id));
+}
+
+// ===== 編集ダイアログ =====
+const editDlg = document.getElementById('editDlg');
+let editingId = null;
+function openEdit(id) {
+  editingId = id;
+  const r = db.records.find((x) => x.id === id);
+  const now = Date.now();
+  document.getElementById('editTitle').textContent = r ? '睡眠を編集' : '睡眠を追加';
+  document.getElementById('fStart').value = toLocalInput(r ? r.start : now - 8 * HOUR);
+  document.getElementById('fEnd').value = toLocalInput(r ? r.end : now);
+  document.getElementById('fWake').value = r ? r.wakeups || 0 : 0;
+  document.getElementById('fMood').value = r && r.mood ? r.mood : '';
+  document.getElementById('delBtn').hidden = !r;
+  editDlg.showModal();
+}
+document.getElementById('addManual').onclick = () => openEdit(null);
+document.getElementById('cancelEdit').onclick = () => editDlg.close();
+document.getElementById('delBtn').onclick = () => {
+  if (!confirm('この記録を削除しますか？')) return;
+  db.records = db.records.filter((r) => r.id !== editingId);
+  save(); editDlg.close(); render();
+};
+document.getElementById('editForm').onsubmit = (e) => {
+  const start = new Date(document.getElementById('fStart').value).getTime();
+  const end = new Date(document.getElementById('fEnd').value).getTime();
+  if (!(end > start)) { e.preventDefault(); alert('起きた時刻は寝た時刻より後にしてください'); return; }
+  if (end - start > 20 * HOUR) { e.preventDefault(); alert('20時間を超える睡眠は記録できません'); return; }
+  const wakeups = clamp(parseInt(document.getElementById('fWake').value, 10) || 0, 0, 20);
+  const moodV = document.getElementById('fMood').value;
+  let r = db.records.find((x) => x.id === editingId);
+  if (!r) { r = addSleep(start, end, 'manual'); }
+  // 時刻を手で直したら、自動計算の「起きていた時間」はリセット
+  if (r.start !== start || r.end !== end) r.awakeMs = 0;
+  Object.assign(r, { start, end, wakeups, mood: moodV ? Number(moodV) : null });
+  save(); render();
+};
+
+// ===== 設定ダイアログ =====
+const settingsDlg = document.getElementById('settingsDlg');
+const autoUrlTemplate = () => `${location.origin}${location.pathname}#auto={OFF},{ON}`;
+document.getElementById('openSettings').onclick = () => {
+  const s = db.settings;
+  document.getElementById('sGoal').value = s.goalH;
+  document.getElementById('sLatency').value = s.latencyMin;
+  document.getElementById('sNightStart').value = s.nightStart;
+  document.getElementById('sNightEnd').value = s.nightEnd;
+  document.getElementById('sMerge').value = s.mergeMin;
+  document.getElementById('autoUrl').textContent = autoUrlTemplate();
+  settingsDlg.showModal();
+};
+document.getElementById('cancelSettings').onclick = () => settingsDlg.close();
+document.getElementById('settingsForm').onsubmit = () => {
+  const num = (id, lo, hi, def) => { const v = Number(document.getElementById(id).value); return isFinite(v) && document.getElementById(id).value !== '' ? clamp(v, lo, hi) : def; };
+  db.settings = {
+    goalH: num('sGoal', 4, 12, DEFAULT_SETTINGS.goalH),
+    latencyMin: num('sLatency', 0, 120, DEFAULT_SETTINGS.latencyMin),
+    nightStart: Math.round(num('sNightStart', 0, 23, DEFAULT_SETTINGS.nightStart)),
+    nightEnd: Math.round(num('sNightEnd', 0, 23, DEFAULT_SETTINGS.nightEnd)),
+    mergeMin: num('sMerge', 0, 180, DEFAULT_SETTINGS.mergeMin),
+  };
+  save(); render(); toast('設定を保存しました');
+};
+document.getElementById('copyUrl').onclick = async () => {
+  try { await navigator.clipboard.writeText(autoUrlTemplate()); toast('コピーしました'); }
+  catch (e) { toast('コピーできませんでした。長押しで選択してください'); }
+};
+document.getElementById('testAuto').onclick = () => {
+  settingsDlg.close();
+  const d = new Date(); d.setHours(0, 30, 0, 0);
+  const off = Math.floor(d.getTime() / 1000) - DAY / 1000 * (d.getTime() > Date.now() ? 1 : 0);
+  toast('テスト：0:30に置いて6時間半後に触った想定で取り込みます', '実行', () => importAuto(off, off + 6.5 * 3600));
+};
+document.getElementById('exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nemulog-${toLocalInput(Date.now()).slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
+document.getElementById('importFile').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!Array.isArray(d.records)) throw new Error();
+    if (!confirm(`${d.records.length}件の記録を読み込み、今の記録と置き換えますか？`)) return;
+    db = { records: d.records, sleepingSince: d.sleepingSince || null, settings: { ...DEFAULT_SETTINGS, ...d.settings } };
+    save(); settingsDlg.close(); render(); toast('読み込みました');
+  } catch (err) { alert('ファイルを読み込めませんでした'); }
+  e.target.value = '';
+};
+
+// ===== トースト =====
+let toastTimer;
+function toast(msg, actionLabel, action) {
+  const el = document.getElementById('toast'), btn = document.getElementById('toastBtn');
+  document.getElementById('toastMsg').textContent = msg;
+  btn.hidden = !actionLabel;
+  if (actionLabel) { btn.textContent = actionLabel; btn.onclick = () => { el.classList.remove('show'); action(); }; }
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), actionLabel ? 8000 : 3500);
+}
+
+// ===== 起動 =====
+window.addEventListener('hashchange', handleHash);
+handleHash();
+render();
+setInterval(() => { if (db.sleepingSince) renderStatus(); }, 30 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { db = load(); render(); } });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
